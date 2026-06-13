@@ -7,3 +7,5 @@ set(ANDROID_NATIVE_API_LEVEL 30)
 set(ANDROID_STL c++_shared)
 set(ANDROID_ABI arm64-v8a)
 set(ANDROID_CPP_FEATURES rtti)
+
+add_executable(${PROJECT_NAME} main/main.cpp)
