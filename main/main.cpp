@@ -1,24 +1,27 @@
-#include "ap/touch/virtual_touch.h"
+#include "ap/touch/touch_controller.h"
 #include <chrono>
 #include <iostream>
 #include <thread>
 
+#include "ap/mem/map.h"
+
 int main() {
-    auto touch = ap::touch::virtual_touch::create(3);
-    if (touch) {
-        std::cout << "创建成功\n";
-    }
-    touch->run_forward_worker();
-    touch->down(0, 100, 800);
-    touch->submit();
+    // ap::touch::touch_controller touch_controller(3);
+    // touch_controller.move(200, 200, 800, 800, 1000,
+    //                       std::chrono::milliseconds(10));
+    // touch_controller.move(150, 800, 0, 2000, 1000,
+    //                       std::chrono::milliseconds(10));
+    // touch_controller.move(700, 800, 1000, 20, 1000,
+    //                       std::chrono::milliseconds(10));
 
-    for (int x = 100; x < 800; x += 2) {
-        touch->move(0, x, 800);
-        touch->submit();
+    // while (touch_controller.has_tasks()) {
+    //     touch_controller.update();
+    //     std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    // }
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
-    }
+    ap::mem::map64 map{1};
+    map.parse_only("libil2cpp.so");
 
-    touch->up(0);
-    touch->submit();
+    for (const auto &e : map.get_entries())
+        std::cout << e.start << " " << e.end << std::endl;
 }

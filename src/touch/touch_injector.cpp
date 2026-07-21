@@ -1,4 +1,4 @@
-#include "ap/touch/virtual_touch.h"
+#include "ap/touch/detail/touch_injector.h"
 
 #include "ap/meta/log.h"
 
@@ -16,21 +16,22 @@
 #include <linux/uinput.h>
 #include <vector>
 
-namespace ap::touch {
+namespace ap::touch::detail {
 
-std::unique_ptr<virtual_touch> virtual_touch::create(int max_forward_slot) {
-    auto touch = std::make_unique<virtual_touch>();
+std::unique_ptr<touch_injector>
+touch_injector::create(int max_forward_slot) noexcept {
+    auto touch = std::make_unique<touch_injector>();
     touch->max_forward_slot = max_forward_slot;
 
     touch->uinput_fd = open("/dev/uinput", O_RDWR);
     if (touch->uinput_fd == -1) {
-        LOGW("virtual_touch::create: /dev/uinput 打开失败");
+        LOGW("touch_injector::create: /dev/uinput 打开失败");
         return nullptr;
     }
 
     touch->event_fd = touch->scan_touch_device();
     if (touch->event_fd == -1) {
-        LOGW("virtual_touch::create: 查找触摸设备失败");
+        LOGW("touch_injector::create: 查找触摸设备失败");
         return nullptr;
     }
 
@@ -40,16 +41,16 @@ std::unique_ptr<virtual_touch> virtual_touch::create(int max_forward_slot) {
     return touch;
 }
 
-virtual_touch::~virtual_touch() {
+touch_injector::~touch_injector() {
     cleanup_finger();
     ioctl(event_fd, EVIOCGRAB, 0);
-    stop_forward_worker();
 
+    stop_forward_worker();
     close(uinput_fd);
     close(event_fd);
 }
 
-int virtual_touch::scan_touch_device() const {
+int touch_injector::scan_touch_device() const {
     std::array<unsigned long, 64> abs_bits;
 
     for (auto entry : std::filesystem::directory_iterator("/dev/input")) {
@@ -62,7 +63,7 @@ int virtual_touch::scan_touch_device() const {
 
         if (check_key_bit(ABS_MT_SLOT, abs_bits.data()) &&
             check_key_bit(ABS_MT_POSITION_X, abs_bits.data())) {
-            LOGI("virtual_touch::scan_touch_device: touch event path=%s",
+            LOGI("touch_injector::scan_touch_device: touch event path=%s",
                  entry.path().c_str());
             return fd;
         }
@@ -72,8 +73,8 @@ int virtual_touch::scan_touch_device() const {
     return -1;
 }
 
-bool virtual_touch::check_key_bit(unsigned int bit,
-                                  const unsigned long *arr) const noexcept {
+bool touch_injector::check_key_bit(unsigned int bit,
+                                   const unsigned long *arr) const noexcept {
     constexpr auto long_bits = sizeof(unsigned long) * 8;
 
     if (bit >= sizeof(unsigned long) * 64)
@@ -83,12 +84,12 @@ bool virtual_touch::check_key_bit(unsigned int bit,
     return (arr[bit / long_bits] & mask) != 0;
 }
 
-void virtual_touch::init_device() {
+void touch_injector::init_device() {
     uinput_user_dev dev{};
     input_id id{};
 
     ioctl(event_fd, EVIOCGID, &id);
-    char name[UINPUT_MAX_NAME_SIZE] = "virtual_touch";
+    char name[UINPUT_MAX_NAME_SIZE] = "touch_injector";
     strncpy(dev.name, name, UINPUT_MAX_NAME_SIZE);
     dev.id = id;
 
@@ -127,7 +128,7 @@ void virtual_touch::init_device() {
     ioctl(event_fd, EVIOCGRAB, 1);
 }
 
-void virtual_touch::run_forward_worker() noexcept {
+void touch_injector::run_forward_worker() noexcept {
     if (!is_stopping)
         return;
 
@@ -139,7 +140,7 @@ void virtual_touch::run_forward_worker() noexcept {
         while (!is_stopping.load()) {
             auto n = read(event_fd, &ev, sizeof(ev));
             if (n < 0) {
-                LOGE("virtual_touch::run_forward_worker read failed: %s",
+                LOGE("touch_injector::run_forward_worker read failed: %s",
                      strerror(errno));
                 continue;
             }
@@ -169,21 +170,22 @@ void virtual_touch::run_forward_worker() noexcept {
     is_stopping = false;
 }
 
-void virtual_touch::submit_data(std::span<input_event> evs) noexcept {
+void touch_injector::submit_data(std::span<input_event> evs) noexcept {
     if (write(uinput_fd, evs.data(), evs.size_bytes()) == -1)
-        LOGE("virtual_touch::submit write failed: %s", strerror(errno));
+        LOGE("touch_injector::submit write failed: %s", strerror(errno));
 }
 
-void virtual_touch::stop_forward_worker() noexcept {
+void touch_injector::stop_forward_worker() noexcept {
     is_stopping = true;
-    forward_event_worker->join();
+    if (forward_event_worker)
+        forward_event_worker->join();
 }
 
-bool virtual_touch::is_running_forward() const noexcept {
+bool touch_injector::is_running_forward() const noexcept {
     return !is_stopping.load();
 }
 
-void virtual_touch::down(int slot, int x, int y) noexcept {
+void touch_injector::down(int slot, int x, int y) noexcept {
     const int send_slot = virtual_slot(slot);
     if (slot_down[send_slot])
         return;
@@ -198,7 +200,7 @@ void virtual_touch::down(int slot, int x, int y) noexcept {
     slot_down[send_slot] = true;
 }
 
-void virtual_touch::move(int slot, int x, int y) noexcept {
+void touch_injector::move(int slot, int x, int y) noexcept {
     const int send_slot = virtual_slot(slot);
     if (!slot_down[send_slot])
         return;
@@ -211,10 +213,11 @@ void virtual_touch::move(int slot, int x, int y) noexcept {
     event_cache.emplace_back(timeval{}, EV_ABS, ABS_MT_POSITION_Y, y);
 }
 
-void virtual_touch::up(int slot) noexcept {
+void touch_injector::up(int slot) noexcept {
     const int send_slot = virtual_slot(slot);
     if (!slot_down[send_slot])
         return;
+
     if (curr_event_cache_slot != send_slot)
         event_cache.emplace_back(timeval{}, EV_ABS, ABS_MT_SLOT, send_slot);
     event_cache.emplace_back(timeval{}, EV_ABS, ABS_MT_TRACKING_ID, -1);
@@ -223,7 +226,10 @@ void virtual_touch::up(int slot) noexcept {
     slot_down[send_slot] = false;
 }
 
-void virtual_touch::submit() noexcept {
+void touch_injector::submit() noexcept {
+    if (event_cache.empty())
+        return;
+
     event_cache.emplace_back(timeval{}, EV_SYN, SYN_REPORT, 0);
     {
         std::lock_guard lock{submit_mutex};
@@ -239,16 +245,20 @@ void virtual_touch::submit() noexcept {
     event_cache.clear();
 }
 
-void virtual_touch::cleanup_finger() noexcept {
+void touch_injector::cleanup_finger() noexcept {
     for (int i = 0; i < 10; i++) {
         up(i - max_forward_slot - 1);
         submit();
     }
 }
 
-int virtual_touch::real_fd() const noexcept { return event_fd; }
-int virtual_touch::virtual_fd() const noexcept { return uinput_fd; }
-int virtual_touch::virtual_slot(int slot) const noexcept {
+int touch_injector::real_fd() const noexcept { return event_fd; }
+int touch_injector::virtual_fd() const noexcept { return uinput_fd; }
+
+bool touch_injector::is_virtual_down(int solt) const noexcept {
+    return slot_down[virtual_slot(solt)];
+}
+int touch_injector::virtual_slot(int slot) const noexcept {
     return max_forward_slot + slot + 1;
 }
-} // namespace ap::touch
+} // namespace ap::touch::detail

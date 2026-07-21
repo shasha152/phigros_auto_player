@@ -7,8 +7,8 @@
 #include <thread>
 #include <vector>
 
-namespace ap::touch {
-class virtual_touch {
+namespace ap::touch::detail {
+class touch_injector {
     int uinput_fd;
     int event_fd;
 
@@ -24,7 +24,8 @@ class virtual_touch {
     std::array<bool, 10> slot_down{};
 
   public:
-    static std::unique_ptr<virtual_touch> create(int max_forward_slot);
+    static std::unique_ptr<touch_injector>
+    create(int max_forward_slot) noexcept;
     int real_fd() const noexcept;
     int virtual_fd() const noexcept;
 
@@ -37,7 +38,9 @@ class virtual_touch {
     void up(int slot) noexcept;
     void submit() noexcept;
 
-    ~virtual_touch();
+    bool is_virtual_down(int solt) const noexcept;
+
+    ~touch_injector();
 
   private:
     int scan_touch_device() const;
@@ -47,7 +50,7 @@ class virtual_touch {
     void submit_data(std::span<input_event> evs) noexcept;
 
     int virtual_slot(int slot) const noexcept;
-    
+
     void cleanup_finger() noexcept;
 };
-} // namespace ap::touch
+} // namespace ap::touch::detail
