@@ -8,7 +8,6 @@
 #include <cstring>
 #include <fcntl.h>
 #include <filesystem>
-#include <linux/input-event-codes.h>
 #include <mutex>
 #include <thread>
 #include <unistd.h>
@@ -225,7 +224,7 @@ void virtual_touch::up(int slot) noexcept {
 }
 
 void virtual_touch::submit() noexcept {
-    event_cache.emplace_back(timeval{}, EV_SYN, SYN_REPORT);
+    event_cache.emplace_back(timeval{}, EV_SYN, SYN_REPORT, 0);
     {
         std::lock_guard lock{submit_mutex};
         submit_data(event_cache);
