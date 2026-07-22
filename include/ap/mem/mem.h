@@ -1,32 +1,17 @@
 #pragma once
 
-#include "ap/meta/log.h"
-#include <filesystem>
-#include <fstream>
-#include <string>
-#include <string_view>
-#include <sys/types.h>
-
+#include <type_traits>
 namespace ap::mem {
-
-inline pid_t find_pid_of_cmdline(std::string_view name) noexcept {
-    std::string str;
-
-    for (auto dir : std::filesystem::directory_iterator("/proc")) {
-        auto path = dir.path().string() + "/cmdline";
-
-        if (std::filesystem::exists(path)) {
-            std::ifstream file(path);
-            std::getline(file, str, '\0');
-
-            if (str == name)
-                return std::stoi(dir.path().filename());
-        }
-    }
-
-    LOGW("find_pid_of_cmdline: 获取%sPID失败", name.data());
-    return 0;
+namespace detail {
+class vm_rdwr;
 }
 
+template <typename Mem, typename = void> class basic_reader {
+  public:
+};
+
+template <typename Mem>
+class basic_reader<Mem,
+                   std::enable_if_t<std::is_same_v<Mem, detail::vm_rdwr>>> {};
 
 } // namespace ap::mem

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "detail/pid.h"
 #include <cstdint>
 #include <cstdio>
 #include <fstream>
@@ -18,15 +19,23 @@ template <typename AddrType> struct map_enrty {
         : start(start), end(end) {}
 };
 
-template <typename AddrType> class basic_map {
+template <typename AddrType> class basic_map : public detail::base_pid {
     std::vector<map_enrty<AddrType>> entries;
     std::ifstream file;
 
     using object_type = std::vector<map_enrty<AddrType>>;
 
   public:
-    explicit basic_map(pid_t pid)
-        : file("/proc/" + std::to_string(pid) + "/maps") {}
+    template <
+        typename Pid,
+        std::enable_if_t<
+            std::is_convertible_v<std::remove_cvref_t<Pid>, std::string_view> ||
+                std::is_convertible_v<std::remove_cvref_t<Pid>, pid_t>,
+            int> = 0>
+    explicit basic_map(Pid pid)
+        : detail::base_pid(pid),
+          file("/proc/" + std::to_string(get_pid()) + "/maps") {}
+
     void parse_all() noexcept {
         std::string str;
         entries.reserve(256);

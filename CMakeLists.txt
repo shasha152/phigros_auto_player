@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+add_subdirectory(third_party/pfr)
+
 # set(ANDROID_TOOLCHAIN clang)
 # set(ANDROID_NATIVE_API_LEVEL 30)
 # set(ANDROID_STL c++_shared)
@@ -16,4 +18,4 @@ file(GLOB CPP_SOURCE src/touch/*.cpp)
 add_executable(${PROJECT_NAME} main/main.cpp ${CPP_SOURCE})
 
 target_include_directories(${PROJECT_NAME} PRIVATE include)
-target_link_libraries(${PROJECT_NAME} PRIVATE log android c++_static)
+target_link_libraries(${PROJECT_NAME} PRIVATE log android c++_static pfr)
