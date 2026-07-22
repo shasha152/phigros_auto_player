@@ -4,6 +4,7 @@
 #include <thread>
 
 #include "ap/mem/map.h"
+#include "ap/mem/mem.h"
 
 int main() {
     // ap::touch::touch_controller touch_controller(3);
@@ -18,9 +19,10 @@ int main() {
     //     touch_controller.update();
     //     std::this_thread::sleep_for(std::chrono::milliseconds(1));
     // }
-
-    ap::mem::map64 map{1};
-    map.parse_only("libil2cpp.so");
+    auto pid = ap::mem::find_pid_of_cmdline("bin.mt.plus");
+    LOGI("pid: %d", pid);
+    ap::mem::map64 map{pid};
+    map.parse_only("libc.so");
 
     for (const auto &e : map.get_entries())
         std::cout << e.start << " " << e.end << std::endl;
