@@ -8,7 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_subdirectory(third_party/elfio)
 
-file(GLOB CPP_SOURCE src/touch/*.cpp src/mem/*.cpp)
+file(GLOB CPP_SOURCE src/touch/*.cpp src/mem/*.cpp src/il2cpp/*.cpp)
 
 add_executable(${PROJECT_NAME} main/main.cpp ${CPP_SOURCE})
 

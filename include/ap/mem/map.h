@@ -50,9 +50,8 @@ template <typename AddrType> class basic_map : public detail::base_pid {
 
             std::sscanf(str.c_str(), "%lx-%lx %*s %*s %*s %*s %s", &start, &end,
                         buffer);
-            if (std::string_view(buffer).find(so_str) != std::string::npos) {
+            if (std::string_view(buffer).find(so_str) != std::string::npos)
                 entries.emplace_back(start, end);
-            }
         }
     }
 
