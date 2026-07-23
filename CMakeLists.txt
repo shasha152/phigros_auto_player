@@ -6,16 +6,16 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_subdirectory(third_party/pfr)
+add_subdirectory(third_party/elfio)
 
-# set(ANDROID_TOOLCHAIN clang)
-# set(ANDROID_NATIVE_API_LEVEL 30)
-# set(ANDROID_STL c++_shared)
-# set(ANDROID_ABI arm64-v8a)
-# set(ANDROID_CPP_FEATURES rtti)
-file(GLOB CPP_SOURCE src/touch/*.cpp)
+file(GLOB CPP_SOURCE src/touch/*.cpp src/mem/*.cpp)
 
 add_executable(${PROJECT_NAME} main/main.cpp ${CPP_SOURCE})
 
-target_include_directories(${PROJECT_NAME} PRIVATE include)
-target_link_libraries(${PROJECT_NAME} PRIVATE log android c++_static pfr)
+target_link_libraries(${PROJECT_NAME} PRIVATE log android c++_static elfio)
+
+target_include_directories(${PROJECT_NAME}
+  PRIVATE
+  include
+  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/pfr/include
+)

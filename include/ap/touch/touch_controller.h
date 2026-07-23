@@ -112,7 +112,6 @@ class touch_controller {
                                      dy + static_cast<int>(dis_y * func(t)),
                                      {}});
         }
-
         finger_tasks.emplace_back(slot, st, std::move(points));
     }
 

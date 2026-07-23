@@ -6,7 +6,6 @@
 #include <string>
 #include <string_view>
 #include <sys/types.h>
-#include <unistd.h>
 
 namespace ap::mem {
 
@@ -45,6 +44,11 @@ class base_pid {
 
     pid_t get_pid() const noexcept { return pid; }
 };
+
+template <typename Pid>
+inline static constexpr bool is_convertible_pid_v =
+    std::is_convertible_v<std::remove_cvref_t<Pid>, std::string_view> ||
+    std::is_convertible_v<std::remove_cvref_t<Pid>, pid_t>;
 
 } // namespace detail
 
