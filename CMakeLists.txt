@@ -12,7 +12,7 @@ file(GLOB CPP_SOURCE src/touch/*.cpp src/mem/*.cpp src/il2cpp/*.cpp)
 
 add_executable(${PROJECT_NAME} main/main.cpp ${CPP_SOURCE})
 
-target_link_libraries(${PROJECT_NAME} PRIVATE log android c++_static elfio)
+target_link_libraries(${PROJECT_NAME} PRIVATE log android c++_static elfio::elfio)
 
 target_include_directories(${PROJECT_NAME}
   PRIVATE

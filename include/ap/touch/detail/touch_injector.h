@@ -11,17 +11,17 @@ namespace ap::touch::detail {
 class touch_injector {
     int uinput_fd;
     int event_fd;
-
-    std::unique_ptr<std::thread> forward_event_worker;
-    std::atomic_bool is_stopping = true;
-
     int max_forward_slot;
     int curr_real_slot = 0;
-    std::vector<input_event> event_cache;
     int curr_event_cache_slot = 0;
-    std::mutex submit_mutex;
 
     std::array<bool, 10> slot_down{};
+
+    std::unique_ptr<std::thread> forward_event_worker;
+    std::vector<input_event> event_cache;
+    std::mutex submit_mutex;
+
+    std::atomic_bool is_stopping = true;
 
   public:
     static std::unique_ptr<touch_injector>

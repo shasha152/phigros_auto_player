@@ -25,7 +25,6 @@ template <typename AddrType> class basic_map : public detail::base_pid {
 
   public:
     template <typename Pid>
-        requires detail::is_convertible_pid_v<Pid>
     explicit basic_map(Pid pid)
         : detail::base_pid(pid),
           file("/proc/" + std::to_string(get_pid()) + "/maps") {}

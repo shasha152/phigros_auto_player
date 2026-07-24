@@ -1,6 +1,5 @@
 #pragma once
 
-#include "detail/pid.h"
 #include "detail/vm.h"
 #include "offset.h"
 
@@ -14,9 +13,7 @@ namespace detail {
 
 template <typename Mem> class base_rdwr : public Mem {
   public:
-    template <typename Pid>
-        requires is_convertible_pid_v<Pid>
-    explicit base_rdwr(Pid pid) noexcept : Mem(pid) {}
+    template <typename Pid> explicit base_rdwr(Pid pid) noexcept : Mem(pid) {}
 
     template <typename T>
         requires(!is_offsettable_v<T>)

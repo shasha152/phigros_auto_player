@@ -12,7 +12,6 @@ class vm_rdwr : public base_pid {
     using return_type = int;
 
     template <typename Pid>
-        requires is_convertible_pid_v<Pid>
     explicit vm_rdwr(Pid pid) noexcept : base_pid(pid) {}
 
     int read(std::uintptr_t addr, void *buffer, std::size_t len) noexcept {

@@ -33,22 +33,31 @@ inline pid_t find_pid_of_cmdline(std::string_view name) noexcept {
     return 0;
 }
 
-class base_pid {
-  protected:
-    pid_t pid;
-
-  public:
-    explicit base_pid(pid_t pid) noexcept : pid(pid) {}
-    explicit base_pid(std::string_view name) noexcept
-        : pid(find_pid_of_cmdline(name)) {}
-
-    pid_t get_pid() const noexcept { return pid; }
-};
-
 template <typename Pid>
 inline static constexpr bool is_convertible_pid_v =
     std::is_convertible_v<std::remove_cvref_t<Pid>, std::string_view> ||
     std::is_convertible_v<std::remove_cvref_t<Pid>, pid_t>;
+
+class base_pid {
+    void _init(pid_t pid) noexcept { this->pid = pid; }
+    void _init(std::string_view name) noexcept {
+        pid = find_pid_of_cmdline(name);
+    }
+
+  protected:
+    pid_t pid;
+
+  public:
+    template <typename Pid>
+        requires is_convertible_pid_v<Pid>
+    explicit base_pid(Pid pid) noexcept {
+        _init(pid);
+    }
+    base_pid() noexcept : pid() {}
+
+    pid_t get_pid() const noexcept { return pid; }
+    void set_pid(pid_t pid) noexcept { this->pid = pid; }
+};
 
 } // namespace detail
 
