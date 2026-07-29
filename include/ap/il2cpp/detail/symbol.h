@@ -12,8 +12,9 @@ struct symbol_caller {
     std::uintptr_t addr;
 
     template <typename... Args>
-    inline std::optional<uint64_t> invoke(Args... args) noexcept {
-        std::array<uint64_t, sizeof...(Args)> array{static_cast<uint64_t>(args)...};
+    inline std::optional<int64_t> invoke(Args... args) noexcept {
+        std::array<int64_t, sizeof...(Args)> array{
+            static_cast<int64_t>(args)...};
         return g_ptrace_controller.call(addr, array);
     }
 
@@ -25,9 +26,10 @@ struct symbol_caller {
         g_pid = static_cast<pid_t>(pid);
         g_base_addr = base;
 
-        init_symbol();
+        init_symbol("libil2cpp.so");
         g_ptrace_controller.set_pid(g_pid);
-        g_ptrace_controller.attach();
+        if (!g_ptrace_controller.attach())
+            LOGE("symbol_caller::init_caller: ptrace_attach failed");
     }
 
     inline static pid_t g_pid = 0;
@@ -35,7 +37,9 @@ struct symbol_caller {
     inline static ptrace_controller g_ptrace_controller{};
 
   private:
-    static void init_symbol() noexcept;
+    static void init_symbol(std::string_view lib) noexcept;
 };
+
+std::uintptr_t get_libc_symbol(const char *symbol) noexcept;
 
 } // namespace ap::il2cpp::detail

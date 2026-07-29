@@ -12,6 +12,7 @@
 #include <optional>
 #include <signal.h>
 #include <sys/ptrace.h>
+#include <sys/types.h>
 #include <sys/uio.h>
 #include <sys/user.h>
 #include <sys/wait.h>
@@ -21,6 +22,17 @@
     LOGE(tag ": %s", strerror(errno))
 
 namespace ap::il2cpp::detail {
+
+bool stop_pid(pid_t pid) {
+    if (kill(pid, SIGSTOP) == -1) {
+        LOGW("stop_pid kill: %s", strerror(errno));
+        return false;
+    }
+    waitpid(pid, nullptr, __WALL);
+
+    return true;
+}
+
 bool ptrace_attach(pid_t pid) noexcept {
     bool res = ptrace(PTRACE_ATTACH, pid, nullptr, nullptr) == 0;
     ERROR_LOG("ptrace_attach", res);
@@ -31,8 +43,8 @@ bool ptrace_attach(pid_t pid) noexcept {
 }
 
 bool ptrace_detach(pid_t pid) noexcept {
-    kill(pid, SIGSTOP);
-    waitpid(pid, nullptr, __WALL);
+    if (!stop_pid(pid))
+        return false;
 
     bool res = ptrace(PTRACE_DETACH, pid, nullptr, nullptr) == 0;
     ERROR_LOG("ptrace_detach", res);
@@ -63,12 +75,11 @@ bool ptrace_continue(pid_t pid) noexcept {
     return res;
 }
 
-std::optional<uint64_t> ptrace_call(pid_t pid, uintptr_t func,
-                                    std::span<uint64_t> args) noexcept {
+std::optional<int64_t> ptrace_call(pid_t pid, uintptr_t func,
+                                   std::span<int64_t> args) noexcept {
     user_regs_struct regs, backup;
-
-    kill(pid, SIGSTOP);
-    waitpid(pid, nullptr, __WALL);
+    if (!stop_pid(pid))
+        return false;
 
     if (!ptrace_getregs(pid, &regs))
         return {};
@@ -89,7 +100,7 @@ std::optional<uint64_t> ptrace_call(pid_t pid, uintptr_t func,
     if (!ptrace_getregs(pid, &regs))
         return {};
 
-    uint64_t ret = regs.regs[0];
+    int64_t ret = regs.regs[0];
 
     ptrace_setregs(pid, &backup);
     ptrace_continue(pid);

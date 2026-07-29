@@ -1,9 +1,12 @@
-#include "ap/il2cpp/detail/symbol.h"
+#include "ap/il2cpp/il2cpp.h"
 #include "ap/mem/map.h"
 #include "ap/mem/mem.h"
 #include "ap/mem/pid.h"
 #include <cstdint>
 #include <iostream>
+#include <ostream>
+#include <type_traits>
+#include <vector>
 
 using namespace ap;
 
@@ -19,27 +22,15 @@ int main() {
     mem::accessor reader{pid};
     mem::map64 map{pid};
     map.parse_only("libil2cpp.so");
-    std::uintptr_t libil2cpp_base = map.get_entries().at(1).start;
+    auto module = map.get_module(reader);
+    std::uintptr_t libil2cpp_base = module.has_value() ? module->start : 0;
 
-    // for (auto e : map.get_entries()) {
-    //     int head = 0;
-    //     reader.read(e.start, head);
-    //     if (head == 0x464C457F) {
-    //         libil2cpp_base = e.start;
-    //         break;
-    //     }
-    // }
+    std::cout << std::hex << libil2cpp_base << std::endl;
 
-    il2cpp::detail::symbol_caller::init_caller(pid, libil2cpp_base);
-    auto addr = il2cpp::detail::symbol_caller::get_caller("il2cpp_domain_get")
-                    ->invoke();
-    std::cout << std::hex << "il2cpp_base: " << libil2cpp_base
-              << " domain: " << addr.value_or(0ULL) << std::endl;
-    // test t;
+    il2cpp::init_ctx(pid, libil2cpp_base);
+    auto as = il2cpp::assembly::create("Assembly-CSharp.dll");
 
-    // reader.read(e.start, t);
-
-    // std::cout << std::hex << "addr: " << e.start << ", " << std::dec <<
-    // t.head
-    //           << " " << t.value << std::endl;
+    for (auto obj : as.get_class("", "LevelControl").find_object()) {
+        std::cout << obj << std::endl;
+    }
 }

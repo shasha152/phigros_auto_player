@@ -9,8 +9,8 @@
 
 namespace ap::il2cpp::detail {
 
-std::optional<uint64_t> ptrace_call(pid_t pid, std::uintptr_t addr,
-                                    std::span<std::uint64_t> args) noexcept;
+std::optional<int64_t> ptrace_call(pid_t pid, std::uintptr_t addr,
+                                   std::span<std::int64_t> args) noexcept;
 
 bool ptrace_attach(pid_t pid) noexcept;
 bool ptrace_detach(pid_t pid) noexcept;
@@ -44,8 +44,8 @@ class ptrace_controller : public mem::detail::base_pid {
         return is_attach;
     }
 
-    std::optional<uint64_t> call(std::uintptr_t addr,
-                                 std::span<std::uint64_t> args) {
+    std::optional<int64_t> call(std::uintptr_t addr,
+                                std::span<std::int64_t> args) {
         if (!is_attach)
             return std::nullopt;
 

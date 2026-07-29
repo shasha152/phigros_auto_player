@@ -5,7 +5,6 @@
 #include <type_traits>
 #include <utility>
 
-
 namespace ap::mem {
 namespace detail {
 template <typename T1, typename T2>
@@ -68,11 +67,17 @@ template <typename T, std::uint16_t Offset> class ptrval {
 struct offsettable {};
 
 namespace detail {
+
+template <typename Class, std::size_t Count, typename = void>
+struct is_offsettable : std::false_type {};
+
 template <typename Class, std::size_t Count>
-struct is_offsettable
-    : std::bool_constant<
-          std::is_class_v<Class> &&
-          std::is_same_v<offsettable, pfr::tuple_element_t<Count, Class>>> {};
+struct is_offsettable<
+    Class, Count,
+    std::enable_if_t<
+        std::is_class_v<Class> &&
+        std::is_same_v<offsettable, pfr::tuple_element_t<Count, Class>>>>
+    : std::true_type {};
 
 template <typename T, std::size_t Count, bool End> struct is_offsettable_class {
   private:
@@ -80,14 +85,19 @@ template <typename T, std::size_t Count, bool End> struct is_offsettable_class {
 
   public:
     static constexpr bool value =
-        is_offsettable<T, Count>::value ||
-        is_offsettable_class<T, Count + 1, Count == size - 1>::value;
+        (is_offsettable<T, Count>::value ||
+         is_offsettable_class<T, Count + 1, Count == size - 1>::value);
 };
 template <typename T, std::size_t Count>
 struct is_offsettable_class<T, Count, true> : std::false_type {};
 
 template <typename T>
-inline static constexpr bool is_offsettable_v =
-    is_offsettable_class<T, 0, false>::value;
+inline constexpr bool is_offsettable_v = [] {
+    if constexpr (std::is_aggregate_v<T>) {
+        return is_offsettable_class<T, 0, false>::value;
+    } else {
+        return false;
+    }
+}();
 } // namespace detail
 } // namespace ap::mem

@@ -5,26 +5,40 @@
 
 #include <cstdint>
 #include <pfr.hpp>
+#include <string>
+#include <string_view>
 #include <type_traits>
+#include <utility>
+#include <vector>
 
 namespace ap::mem {
+
+template <typename T> struct buffer_traits {
+    std::pair<void *, std::size_t> operator()(T &val) noexcept {
+        return {&val, sizeof(T)};
+    }
+};
 
 namespace detail {
 
 template <typename Mem> class base_rdwr : public Mem {
   public:
+    using Mem::read;
+    using Mem::write;
     template <typename Pid> explicit base_rdwr(Pid pid) noexcept : Mem(pid) {}
 
     template <typename T>
         requires(!is_offsettable_v<T>)
     Mem::return_type read(std::uintptr_t addr, T &value) noexcept {
-        return Mem::read(addr, &value, sizeof(value));
+        auto [buff, size] = buffer_traits<T>()(value);
+        return Mem::read(addr, buff, size);
     }
 
     template <typename T>
         requires(!is_offsettable_v<T>)
     Mem::return_type write(std::uintptr_t addr, T &value) noexcept {
-        return Mem::write(addr, &value, sizeof(value));
+        auto [buff, size] = buffer_traits<T>()(value);
+        return Mem::write(addr, buff, size);
     }
 };
 } // namespace detail
@@ -93,5 +107,37 @@ using accessor = basic_accessor<detail::vm_rdwr>;
 //     explicit basic_reader(Pid pid) : detail::base_rdwr<Mem>(pid) {
 //     }
 // };
+
+// template <typename Traits, typename Allocator>
+template <typename CharT, typename Traits, typename Allocator>
+struct buffer_traits<std::basic_string<CharT, Traits, Allocator>> {
+    auto operator()(std::basic_string<CharT, Traits, Allocator> &val) noexcept {
+        return std::pair<void *, std::size_t>{val.data(),
+                                              (val.size() + 1) * sizeof(CharT)};
+    }
+};
+
+template <typename CharT, typename Traits>
+struct buffer_traits<std::basic_string_view<CharT, Traits>> {
+    auto operator()(std::basic_string_view<CharT, Traits> &val) noexcept {
+        return std::pair<void *, std::size_t>{const_cast<CharT *>(val.data()),
+                                              (val.size() + 1) * sizeof(CharT)};
+    }
+};
+
+template <typename Tp, typename Allocator>
+struct buffer_traits<std::vector<Tp, Allocator>> {
+    auto operator()(std::vector<Tp, Allocator> &val) noexcept {
+        return std::pair<void *, std::size_t>{val.data(),
+                                              val.size() * sizeof(Tp)};
+    }
+};
+
+template <typename T, std::size_t N> struct buffer_traits<T[N]> {
+    auto operator()(T (&val)[N]) noexcept {
+        return std::pair<void *, std::size_t>{static_cast<void *>(val),
+                                              sizeof(T) * N};
+    }
+};
 
 } // namespace ap::mem

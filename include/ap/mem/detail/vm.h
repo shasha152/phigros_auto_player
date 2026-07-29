@@ -9,12 +9,12 @@
 namespace ap::mem::detail {
 class vm_rdwr : public base_pid {
   public:
-    using return_type = int;
+    using return_type = bool;
 
     template <typename Pid>
     explicit vm_rdwr(Pid pid) noexcept : base_pid(pid) {}
 
-    int read(std::uintptr_t addr, void *buffer, std::size_t len) noexcept {
+    bool read(std::uintptr_t addr, void *buffer, std::size_t len) noexcept {
         iovec local{.iov_base = buffer, .iov_len = len};
         iovec remote{.iov_base = reinterpret_cast<void *>(addr),
                      .iov_len = len};
@@ -22,7 +22,7 @@ class vm_rdwr : public base_pid {
         return read(&local, &remote, 1);
     }
 
-    int write(std::uintptr_t addr, void *buffer, std::size_t len) noexcept {
+    bool write(std::uintptr_t addr, void *buffer, std::size_t len) noexcept {
         iovec local{.iov_base = buffer, .iov_len = len};
         iovec remote{.iov_base = reinterpret_cast<void *>(addr),
                      .iov_len = len};
@@ -30,12 +30,12 @@ class vm_rdwr : public base_pid {
         return write(&local, &remote, 1);
     }
 
-    int read(iovec *local, iovec *remote, int count) noexcept {
-        return vm_readv(get_pid(), local, remote, count);
+    bool read(iovec *local, iovec *remote, int count) noexcept {
+        return vm_readv(get_pid(), local, remote, count) != -1;
     }
 
-    int write(iovec *local, iovec *remote, int count) noexcept {
-        return vm_writev(get_pid(), local, remote, count);
+    bool write(iovec *local, iovec *remote, int count) noexcept {
+        return vm_writev(get_pid(), local, remote, count) != -1;
     }
 };
 } // namespace ap::mem::detail
