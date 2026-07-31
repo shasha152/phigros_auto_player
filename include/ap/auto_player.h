@@ -20,39 +20,39 @@
 #include <utility>
 #include <vector>
 
-#include <chrono>
+// #include <chrono>
 #include <string_view>
 
-class timer {
-  public:
-    explicit timer(std::string_view name = "") noexcept
-        : name_(name), start_(clock::now()) {}
+// class timer {
+//   public:
+//     explicit timer(std::string_view name = "") noexcept
+//         : name_(name), start_(clock::now()) {}
 
-    ~timer() noexcept { LOGI("%s: %lfms", name_.data(), elapsed_ms()); }
+//     ~timer() noexcept { LOGI("%s: %lfms", name_.data(), elapsed_ms()); }
 
-    void reset() noexcept { start_ = clock::now(); }
+//     void reset() noexcept { start_ = clock::now(); }
 
-    double elapsed_ms() const noexcept {
-        return std::chrono::duration<double, std::milli>(clock::now() - start_)
-            .count();
-    }
+//     double elapsed_ms() const noexcept {
+//         return std::chrono::duration<double, std::milli>(clock::now() - start_)
+//             .count();
+//     }
 
-    double elapsed_us() const noexcept {
-        return std::chrono::duration<double, std::micro>(clock::now() - start_)
-            .count();
-    }
+//     double elapsed_us() const noexcept {
+//         return std::chrono::duration<double, std::micro>(clock::now() - start_)
+//             .count();
+//     }
 
-    double elapsed_ns() const noexcept {
-        return std::chrono::duration<double, std::nano>(clock::now() - start_)
-            .count();
-    }
+//     double elapsed_ns() const noexcept {
+//         return std::chrono::duration<double, std::nano>(clock::now() - start_)
+//             .count();
+//     }
 
-  private:
-    using clock = std::chrono::steady_clock;
+//   private:
+//     using clock = std::chrono::steady_clock;
 
-    std::string_view name_;
-    clock::time_point start_;
-};
+//     std::string_view name_;
+//     clock::time_point start_;
+// };
 
 namespace ap {
 namespace detail {
