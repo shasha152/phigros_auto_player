@@ -21,7 +21,7 @@ class touch_injector {
     std::vector<input_event> event_cache;
     std::mutex submit_mutex;
 
-    std::atomic_bool is_stopping = true;
+    std::atomic_bool is_stopping = false;
 
   public:
     static std::unique_ptr<touch_injector>

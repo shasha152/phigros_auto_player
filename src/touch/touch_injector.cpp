@@ -129,7 +129,7 @@ void touch_injector::init_device() {
 }
 
 void touch_injector::run_forward_worker() noexcept {
-    if (!is_stopping)
+    if (is_stopping)
         return;
 
     forward_event_worker.reset(new std::thread([this]() {

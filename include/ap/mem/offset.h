@@ -1,7 +1,10 @@
 #pragma once
 
+#include "pfr/core_name.hpp"
+#include <array>
 #include <cstdint>
 #include <pfr.hpp>
+#include <string>
 #include <type_traits>
 #include <utility>
 
@@ -33,6 +36,11 @@ template <typename T, std::uint16_t Offset> class offval {
 
     reference value() noexcept { return val; }
     const_reference value() const noexcept { return val; }
+
+    template <typename Reader>
+    void update(Reader &reader, std::uintptr_t base) noexcept {
+        reader.read(base + Offset, val);
+    }
 };
 
 template <typename T, std::uint16_t Offset> class ptrval {
@@ -93,11 +101,49 @@ struct is_offsettable_class<T, Count, true> : std::false_type {};
 
 template <typename T>
 inline constexpr bool is_offsettable_v = [] {
-    if constexpr (std::is_aggregate_v<T>) {
+    if constexpr (std::is_aggregate_v<T> && sizeof(T)) {
         return is_offsettable_class<T, 0, false>::value;
     } else {
         return false;
     }
 }();
 } // namespace detail
+
+template <typename T, std::enable_if_t<std::is_aggregate_v<T> &&
+                                           !std::is_same_v<T, offsettable>,
+                                       int> = 0>
+std::string to_string(const T &) noexcept;
+
+template <typename T, size_t N>
+std::string to_string(const std::array<T, N> &) noexcept {
+    return "null";
+}
+template <typename T>
+    requires std::is_arithmetic_v<T>
+std::string to_string(const T &v) {
+    return std::to_string(v);
+}
+
+template <typename T,
+          std::enable_if_t<
+              std::is_aggregate_v<T> && !std::is_same_v<T, offsettable>, int>>
+std::string to_string(const T &val) noexcept {
+
+    std::string res = "{\n";
+    pfr::for_each_field_with_name(val, [&]<typename Ty>(std::string_view name,
+                                                        const Ty &field,
+                                                        std::size_t i) {
+        if constexpr (!std::is_same_v<Ty, offsettable>) {
+            res.push_back('\t');
+            res.append(name);
+            res.append(" : ");
+            res.append(to_string(field));
+            res.append(",\n");
+        }
+    });
+
+    res.push_back('}');
+    return res;
+}
+
 } // namespace ap::mem

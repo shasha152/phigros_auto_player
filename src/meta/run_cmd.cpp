@@ -16,7 +16,6 @@ std::string run_cmd(std::string_view cmd) noexcept {
     char line[1024] = {0};
     while (fgets(line, sizeof(line), file)) {
         res.append(line);
-        memset(line, 0, sizeof(line));
     }
 
     pclose(file);

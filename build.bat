@@ -5,7 +5,7 @@ ninja -j12
 adb logcat -c
 adb push better_auto_player /data/local/tmp
 adb shell "su -c chmod 777 /data/local/tmp/better_auto_player"
-adb shell "su -c /data/local/tmp/better_auto_player"
+start "" /B "adb" "shell" "su -c /data/local/tmp/better_auto_player"
 
 cd ..
 

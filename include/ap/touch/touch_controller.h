@@ -1,27 +1,23 @@
 #pragma once
 
+#include "ap/meta/log.h"
+#include "ap/meta/run_cmd.h"
 #include "ap/touch/detail/touch_injector.h"
+#include <algorithm>
 #include <array>
+#include <atomic>
 #include <cassert>
 #include <chrono>
 #include <ctime>
-#include <list>
 #include <memory>
-#include <queue>
+#include <string>
+#include <thread>
+#include <utility>
+#include <vector>
 
 namespace ap::touch {
 
 namespace detail {
-using time_clock_t = std::chrono::steady_clock;
-
-using time_point_t = std::chrono::time_point<time_clock_t>;
-
-inline time_point_t get_time() noexcept { return time_clock_t::now(); }
-
-template <typename Duration>
-inline time_point_t get_time(const Duration &t) noexcept {
-    return time_clock_t::now() + t;
-}
 
 inline static constexpr auto MAX_SLOT = 9;
 class slot_allocator {
@@ -41,6 +37,8 @@ class slot_allocator {
             }
         }
 
+        LOGI("slot_allocator::allocate: 无手指可分配%d", max_slot);
+
         return -1;
     }
 
@@ -49,108 +47,104 @@ class slot_allocator {
 
 } // namespace detail
 
-struct finger_point {
-    int x;
-    int y;
-
-    detail::time_point_t time;
-    bool is_inject = false;
-};
-
 class touch_controller {
-    struct finger_task {
-        int slot;
-        std::chrono::nanoseconds interval;
-        std::queue<finger_point> points;
-    };
-
     std::unique_ptr<detail::touch_injector> injector;
 
-    detail::time_point_t now_time;
-
-    std::list<finger_task> finger_tasks;
     detail::slot_allocator allocator;
+
+    std::atomic<int> screen_orientation;
+    int screen_height;
+    int screen_width;
+
+    std::thread dump_current_orientatio;
+    std::atomic<bool> is_stop = false;
+
+    std::vector<int> need_delete;
 
   public:
     explicit touch_controller(int real_max_slot) noexcept
         : injector(detail::touch_injector::create(real_max_slot)),
-          allocator(detail::MAX_SLOT - real_max_slot),
-          now_time(detail::get_time()) {
+          allocator(detail::MAX_SLOT - real_max_slot) {
         assert(injector);
         injector->run_forward_worker();
-    }
 
-    bool has_tasks() const noexcept { return !finger_tasks.empty(); }
+        dump_current_orientatio = std::thread([this]() {
+            while (!is_stop) {
+                screen_orientation = std::stoi(meta::run_cmd(
+                    "dumpsys display | grep 'mCurrentOrientation' | "
+                    "cut -d'=' -f2"));
 
-    template <typename Duration> void down(int x, int y, const Duration &t) {
-        int slot = allocator.allocate();
-        assert(slot != -1);
-
-        finger_tasks.push_back(
-            finger_task{slot, t, finger_point{.x = x, .y = y}});
-    }
-
-    template <typename Duration>
-    void move(int dx, int dy, int sx, int sy, int count, const Duration &st) {
-        move(dx, dy, sx, sy, count, st, [](float x) { return x; });
-    }
-
-    template <typename Duration, typename Func>
-    void move(int dx, int dy, int sx, int sy, int count, const Duration &st,
-              const Func &func) {
-        int slot = allocator.allocate();
-        assert(slot != -1);
-
-        const int dis_x = sx - dx;
-        const int dis_y = sy - dy;
-
-        std::queue<finger_point> points;
-
-        for (int i = 0; i < count; i++) {
-            float t = static_cast<float>(i) / (count - 1);
-            points.push(finger_point{dx + static_cast<int>(dis_x * func(t)),
-                                     dy + static_cast<int>(dis_y * func(t)),
-                                     {}});
-        }
-        finger_tasks.emplace_back(slot, st, std::move(points));
-    }
-
-    void update() {
-        now_time = detail::get_time();
-
-        for (auto it = finger_tasks.begin(); it != finger_tasks.end();) {
-            auto &[slot, interval, points] = *it;
-            auto &front_point = points.front();
-
-            if (!front_point.is_inject) {
-                if (!injector->is_virtual_down(slot))
-                    injector->down(slot, front_point.x, front_point.y);
-                else
-                    injector->move(slot, front_point.x, front_point.y);
-
-                front_point.is_inject = true;
-                front_point.time = now_time + interval;
-
-            } else {
-                if (now_time >= front_point.time) {
-                    points.pop();
-
-                    if (points.empty()) {
-                        injector->up(slot);
-                        it = finger_tasks.erase(it);
-
-                        // 释放slot
-                        allocator.deallocate(slot);
-
-                        continue;
-                    }
-                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
             }
+        });
+    }
 
-            it++;
-        }
+    ~touch_controller() {
+        is_stop = true;
 
+        if (dump_current_orientatio.joinable())
+            dump_current_orientatio.join();
+    }
+
+    int down(int x, int y) noexcept {
+        int slot = allocator.allocate();
+        if (slot == -1)
+            return slot;
+
+        auto [rx, ry] = rotate_point(x, y);
+
+        injector->down(slot, rx, ry);
+        return slot;
+    }
+
+    void move(int slot, int x, int y) noexcept {
+        if (slot == -1)
+            return;
+        auto [rx, ry] = rotate_point(x, y);
+        injector->move(slot, rx, ry);
+    }
+
+    void up(int slot) noexcept {
+        if (slot == -1)
+            return;
+        injector->up(slot);
+        need_delete.push_back(slot);
+    }
+
+    void submit() noexcept {
         injector->submit();
+        std::ranges::for_each(need_delete,
+                              [this](int slot) { allocator.deallocate(slot); });
+        need_delete.clear();
+    }
+
+    void set_screen_wh(int width, int height) noexcept {
+        screen_width = width;
+        screen_height = height;
+    }
+
+  private:
+    std::pair<int, int> rotate_point(int x, int y) noexcept {
+        int rotated_x = x;
+        int rotated_y = y;
+
+        switch (screen_orientation) {
+        case 0:
+            break;
+        case 1:
+            rotated_y = x;
+            rotated_x = screen_width - y;
+            break;
+        case 2:
+            rotated_x = screen_width - x;
+            rotated_y = screen_height - y;
+            break;
+        case 3:
+            rotated_y = screen_height - x;
+            rotated_x = y;
+            break;
+        }
+        return {rotated_x, rotated_y};
     }
 };
 

@@ -157,9 +157,6 @@ assembly assembly::create(std::string_view assembly_s) noexcept {
     // LOGI("assembly::create assemblies_array_size: %ld", assemblies.size());
 
     for (size_t i = 0; i < assemblies.size(); i++) {
-        // if (assemblies[i] == 0)
-        //     break;
-
         char name[128] = {0};
 
         auto image_addr = il2caller::get_caller("il2cpp_assembly_get_image")

@@ -37,5 +37,7 @@ class vm_rdwr : public base_pid {
     bool write(iovec *local, iovec *remote, int count) noexcept {
         return vm_writev(get_pid(), local, remote, count) != -1;
     }
+
+    virtual ~vm_rdwr() = default;
 };
 } // namespace ap::mem::detail

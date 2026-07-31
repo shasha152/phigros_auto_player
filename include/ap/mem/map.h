@@ -33,7 +33,7 @@ template <typename AddrType> class basic_map : public detail::base_pid {
         : detail::base_pid(pid),
           file("/proc/" + std::to_string(get_pid()) + "/maps") {}
 
-    void parse_all() noexcept {
+    basic_map &parse_all() noexcept {
         std::string str;
         entries.reserve(256);
         char buffer[1024];
@@ -45,9 +45,11 @@ template <typename AddrType> class basic_map : public detail::base_pid {
 
             data.parent_path = buffer;
         }
+
+        return *this;
     }
 
-    void parse_only(std::string_view so_str) noexcept {
+    basic_map &parse_only(std::string_view so_str) noexcept {
         entries.reserve(8);
         std::string str;
 
@@ -63,6 +65,8 @@ template <typename AddrType> class basic_map : public detail::base_pid {
                 entries.emplace_back(
                     map_entry<AddrType>{start, end, perm, buffer});
         }
+
+        return *this;
     }
 
     const object_type &get_entries() const noexcept { return entries; }

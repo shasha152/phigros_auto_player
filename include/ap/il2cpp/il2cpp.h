@@ -50,6 +50,7 @@ class _class {
     std::string cls_name;
 
   public:
+    _class() = default;
     explicit _class(std::uintptr_t handle) noexcept : handle(handle) {}
 
     template <typename ObjectQuerier = object_querier>

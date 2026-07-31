@@ -3,6 +3,7 @@
 #include "detail/vm.h"
 #include "offset.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <pfr.hpp>
 #include <string>
@@ -14,14 +15,29 @@
 namespace ap::mem {
 
 template <typename T> struct buffer_traits {
-    std::pair<void *, std::size_t> operator()(T &val) noexcept {
+    std::pair<T *, std::size_t> operator()(T &val) noexcept {
         return {&val, sizeof(T)};
+    }
+};
+
+// template <typename Handle>
+// using handle_traits_return_t =
+//     std::invoke_result_t<Handle, std::uintptr_t, void *, size_t>;
+
+
+
+template <typename T> struct handle_traits {
+    template <typename Handle, typename... Args>
+    void operator()(std::uintptr_t addr, T &val, const Handle &handle,
+                    Args &&...args) noexcept {
+        auto [buff, size] = buffer_traits<T>()(val);
+        handle(addr, buff, size, std::forward<Args>(args)...);
     }
 };
 
 namespace detail {
 
-template <typename Mem> class base_rdwr : public Mem {
+template <typename Mem, typename Base> class base_rdwr : public Mem {
   public:
     using Mem::read;
     using Mem::write;
@@ -29,28 +45,49 @@ template <typename Mem> class base_rdwr : public Mem {
 
     template <typename T>
         requires(!is_offsettable_v<T>)
-    Mem::return_type read(std::uintptr_t addr, T &value) noexcept {
-        auto [buff, size] = buffer_traits<T>()(value);
-        return Mem::read(addr, buff, size);
+    void read(std::uintptr_t addr, T &value) noexcept {
+        // auto [buff, size] = buffer_traits<T>()(value);
+        // return Mem::read(addr, buff, size);
+
+        return handle_traits<T>()(
+            addr, value,
+            [this]<typename Tp>(auto addr, Tp *buffer, auto size, auto self) {
+                if constexpr (is_offsettable_v<Tp>)
+                    static_cast<Base *>(self)->read(addr, *buffer);
+                else
+                    self->Mem::read(addr, buffer, size);
+            },
+            this);
     }
 
     template <typename T>
         requires(!is_offsettable_v<T>)
-    Mem::return_type write(std::uintptr_t addr, T &value) noexcept {
-        auto [buff, size] = buffer_traits<T>()(value);
-        return Mem::write(addr, buff, size);
+    void write(std::uintptr_t addr, T &value) noexcept {
+        // auto [buff, size] = buffer_traits<T>()(value);
+        // return Mem::write(addr, buff, size);
+        return handle_traits<T>()(
+            addr, value,
+            [this]<typename Tp>(auto addr, Tp *buffer, auto size, auto self) {
+                if constexpr (is_offsettable_v<Tp>)
+                    static_cast<Base *>(self)->write(addr, *buffer);
+                else
+                    self->Mem::write(addr, buffer, size);
+            },
+            this);
     }
 };
 } // namespace detail
 
-template <typename Mem, typename = void>
-class basic_accessor : public detail::base_rdwr<Mem> {
+template <typename Mem>
+class basic_accessor : public detail::base_rdwr<Mem, basic_accessor<Mem>> {
+    using parent_type = detail::base_rdwr<Mem, basic_accessor<Mem>>;
+
   public:
-    using detail::base_rdwr<Mem>::read;
-    using detail::base_rdwr<Mem>::write;
+    using parent_type::read;
+    using parent_type::write;
 
     template <typename Pid>
-    explicit basic_accessor(Pid pid) : detail::base_rdwr<Mem>(pid) {}
+    explicit basic_accessor(Pid pid) : parent_type(pid) {}
 
     template <typename T>
         requires detail::is_offsettable_v<T>
@@ -112,31 +149,31 @@ using accessor = basic_accessor<detail::vm_rdwr>;
 template <typename CharT, typename Traits, typename Allocator>
 struct buffer_traits<std::basic_string<CharT, Traits, Allocator>> {
     auto operator()(std::basic_string<CharT, Traits, Allocator> &val) noexcept {
-        return std::pair<void *, std::size_t>{val.data(),
-                                              (val.size() + 1) * sizeof(CharT)};
+        return std::pair<CharT *, std::size_t>{val.data(), (val.size() + 1) *
+                                                               sizeof(CharT)};
     }
 };
 
 template <typename CharT, typename Traits>
 struct buffer_traits<std::basic_string_view<CharT, Traits>> {
     auto operator()(std::basic_string_view<CharT, Traits> &val) noexcept {
-        return std::pair<void *, std::size_t>{const_cast<CharT *>(val.data()),
-                                              (val.size() + 1) * sizeof(CharT)};
+        return std::pair<CharT *, std::size_t>{
+            const_cast<CharT *>(val.data()), (val.size() + 1) * sizeof(CharT)};
     }
 };
 
 template <typename Tp, typename Allocator>
 struct buffer_traits<std::vector<Tp, Allocator>> {
     auto operator()(std::vector<Tp, Allocator> &val) noexcept {
-        return std::pair<void *, std::size_t>{val.data(),
-                                              val.size() * sizeof(Tp)};
+        return std::pair<Tp *, std::size_t>{val.data(),
+                                            val.size() * sizeof(Tp)};
     }
 };
 
 template <typename T, std::size_t N> struct buffer_traits<T[N]> {
     auto operator()(T (&val)[N]) noexcept {
-        return std::pair<void *, std::size_t>{static_cast<void *>(val),
-                                              sizeof(T) * N};
+        return std::pair<T *, std::size_t>{static_cast<T *>(val),
+                                           sizeof(T) * N};
     }
 };
 
