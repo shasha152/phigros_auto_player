@@ -25,5 +25,7 @@
 ## Build
 
 git clone --recursive https://github.com/shasha152/phigros_auto_player.git
+
 cd phigros_auto_player
+
 cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=<NDK>/build/cmake/android.toolchain.cmake -DANDROID_TOOLCHAIN=clang -DANDROID_NATIVE_API_LEVEL=30 -DANDROID_STL=c++_shared -DANDROID_ABI=arm64-v8a -DANDROID_CPP_FEATURES=rtti
